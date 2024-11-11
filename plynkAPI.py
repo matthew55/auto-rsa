@@ -98,40 +98,53 @@ def plynk_holdings(plynk_obj: Brokerage, loop=None):
     printHoldings(plynk_obj, loop)
 
 
-def plynk_transaction(plynk_obj: Brokerage, order_obj: stockOrder, loop=None):
-    raise NotImplementedError("Not implemented yet, ya bloody bloak!")
+def plynk_transaction(plynk_obj: Brokerage, orderObj: stockOrder, loop=None):
+    print("\n==============================")
+    print("Plynk Transaction Start")
+    print("==============================\n")
 
-    print()
-    print("==============================")
-    print("Plynk")
-    print("==============================")
-    print()
-
-    for stock in order_obj.get_stocks():
+    for s in orderObj.get_stocks():
         for key in plynk_obj.get_account_numbers():
             printAndDiscord(
-                f"{key}: {order_obj.get_action()}ing {order_obj.get_amount()} of {stock}...",
+                f"{key}: {orderObj.get_action()}ing {orderObj.get_amount()} of {s}...",
                 loop,
             )
             for account in plynk_obj.get_account_numbers(key):
-                plynk: Plynk = plynk_obj.get_logged_in_objects(key)
                 print_account = maskString(account)
+                plynk: Plynk = plynk_obj.get_logged_in_objects(key)
                 try:
-                    order = plynk.place_order(
-                        symbol=stock,
-                        quantity=order_obj.get_amount(),
-                        side=order_obj.get_action(),
-                        order_type="market",
-                        time_in_force="day",
-                        is_dry_run=order_obj.get_dry(),
+                    order = plynk.place_order_price(
+                        account_number=account,
+                        ticker=s,
+                        quantity=1.0,  # $1 worth
+                        side=orderObj.get_action(),
+                        price="market",
+                        dry_run=orderObj.get_dry()
                     )
-                    if order["success"] is True:
-                        order = "Success"
-                    printAndDiscord(
-                        f"{key}: {order_obj.get_action()} {order_obj.get_amount()} of {stock} in {print_account}: {order}",
-                        loop,
-                    )
+                    # Print and send confirmation details to Discord                    
+                    if order.get("success") is True or order.get("dry_run_success") is True:
+                        if orderObj.get_dry():
+                            printAndDiscord(
+                                f"DRY RUN Success for: {key} account {print_account}: {orderObj.get_action()} {orderObj.get_amount()} shares of {s}",
+                                loop,
+                            )
+                        else:
+                            printAndDiscord(
+                                f"{key} account {print_account}: {orderObj.get_action()} {orderObj.get_amount()} shares of {s}",
+                                loop,
+                            )
+                    else:
+                        print(f"Order response: {order}")
+                        if 'messages' in order and order['messages'].get('messageList'):
+                            for message in order['messages']['messageList']:
+                                message_content = f"Message Code: {message.get('code')}, Content: {message.get('messageContent')}"
+                                printAndDiscord(message_content, loop)
                 except Exception as e:
                     printAndDiscord(f"{print_account}: Error placing order: {e}", loop)
                     traceback.print_exc()
                     continue
+                
+    print("\n==============================")
+    print("Plynk Transaction End")
+    print("==============================\n")
+
